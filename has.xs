@@ -6,12 +6,12 @@
 
 MODULE = UNIVERSAL::has        PACKAGE = UNIVERSAL::has        
 
-AV *
+SV *
 xs_has(sv)
     SV * sv
 PROTOTYPE: $
 PREINIT:
-    HV *pkg = NULL;
+    HV *pkg;
     AV *linear_av;
 
     HV *cstash;
@@ -20,23 +20,23 @@ PREINIT:
 
     HE *entry;
     SV *val;
+    CV *cv;
+    char *key;
 
-    I32 len;
+    STRLEN len;
 
-    char *txt;
+    AV* ret;
 CODE:
-    RETVAL = newAV();
-    sv_2mortal((SV*)RETVAL);
+    ret = newAV();
 
-    SvGETMAGIC(sv);
-
-    if (!SvOK(sv) || !SvOBJECT(sv))
+    if (!(SvROK(sv) && SvOBJECT(SvRV(sv))))
         XSRETURN_EMPTY;
 
-    pkg = SvSTASH(sv);
+    sv = MUTABLE_SV(SvRV(sv));
+    if (SvOBJECT(sv))
+        pkg = SvSTASH(sv);
 
     if (pkg) {
-
         linear_av = mro_get_linear_isa(pkg); /* has ourselves at the top of the list */
 
         linear_svp = AvARRAY(linear_av);
@@ -46,19 +46,29 @@ CODE:
             linear_sv = *linear_svp++;
             cstash = gv_stashsv(linear_sv, 0);
 
+            /* av_push(ret, newSVpv(SvPV_nolen(linear_sv), 0)); */
+
             if (cstash) {
                 hv_iterinit(cstash);
-                while ((entry = hv_iternext(cstash))) {
-                    val = hv_iterval(cstash,entry);
 
-                    if (val && SvTYPE(val) == SVt_PVCV) {
-                        txt = hv_iterkey(entry,&len);
+                while (entry = hv_iternext(cstash)) {
+                    val = HeVAL(entry);
 
-                        av_push(RETVAL, newSVpv(txt,0));
+                    /* av_push(ret, newSVpv(SvPV_nolen(val), 0)); */
+
+                    if (SvTYPE(val) == SVt_PVGV) {
+                        cv = GvCV(val);
+
+                        if (cv && SvTYPE(cv) == SVt_PVCV) {
+                            key = HePV(entry, len);
+                            av_push(ret, newSVpv(key,0));
+                        }
                     }
                 }
             }
         }
     }
+
+    RETVAL = newRV_noinc((SV *)ret);
 OUTPUT:
     RETVAL
