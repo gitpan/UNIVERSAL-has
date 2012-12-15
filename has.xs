@@ -4,71 +4,60 @@
 
 #include "ppport.h"
 
-MODULE = UNIVERSAL::has		PACKAGE = UNIVERSAL::has		
+MODULE = UNIVERSAL::has        PACKAGE = UNIVERSAL::has        
 
-SV *
-xs_has(obj)
-    SV * obj
-INIT:
-    AV * results;
+AV *
+xs_has(sv)
+    SV * sv
+PREINIT:
+    HV *pkg = NULL;
+    AV *linear_av;
 
-    results = (AV *)sv_2mortal((SV *)newAV());
+    HV *cstash;
+    SV **linear_svp;
+    SV *linear_sv;
+
+    HE *entry;
+    SV *val;
+
+    I32 len;
+
+    char *txt;
 CODE:
-    SV   *sv;
-    HV   *pkg = NULL;
-    AV* linear_av;
-
-    sv = obj;
+    RETVAL = newAV();
+    sv_2mortal((SV*)RETVAL);
 
     SvGETMAGIC(sv);
 
-    if (!SvOK(sv) || !(SvROK(sv) || (SvPOK(sv) && SvCUR(sv))
-		|| (SvGMAGICAL(sv) && SvPOKp(sv) && SvCUR(sv))))
-	XSRETURN_UNDEF;
+    if (!SvOK(sv) || !SvOBJECT(sv))
+        XSRETURN_EMPTY;
 
-    if (SvROK(sv)) {
-        sv = MUTABLE_SV(SvRV(sv));
-        if (SvOBJECT(sv))
-            pkg = SvSTASH(sv);
-    }
-    else {
-        pkg = gv_stashsv(sv, 0);
-    }
+    pkg = SvSTASH(sv);
 
     if (pkg) {
-	    HV* cstash;
-	    SV** linear_svp;
-	    SV* linear_sv;
 
-	    linear_av = mro_get_linear_isa(pkg); /* has ourselves at the top of the list */
+        linear_av = mro_get_linear_isa(pkg); /* has ourselves at the top of the list */
 
-	    linear_svp = AvARRAY(linear_av);
-	    items = AvFILLp(linear_av);
-	    while (items--) {
-		    linear_sv = *linear_svp++;
-		    cstash = gv_stashsv(linear_sv, 0);
+        linear_svp = AvARRAY(linear_av);
+        items = AvFILLp(linear_av);
 
-		    if (cstash) {
-			    HE *entry;
-			    const I32 riter = HvRITER_get(cstash);
-			    HE * const eiter = HvEITER_get(cstash);
-			    hv_iterinit(cstash);
-			    while ((entry = hv_iternext_flags(cstash, 0))) {
-				SV *val = hv_iterval(cstash,entry);
+        while (items--) {
+            linear_sv = *linear_svp++;
+            cstash = gv_stashsv(linear_sv, 0);
 
-				if (val) {
-				    STRLEN len;
-				    char *txt = hv_iterkey(entry,&len);
+            if (cstash) {
+                hv_iterinit(cstash);
+                while ((entry = hv_iternext(cstash))) {
+                    val = hv_iterval(cstash,entry);
 
-				    av_push(results, newSVpv(txt,0));
-				}
-			    }
-			    HvRITER_set(cstash, riter);
-			    HvEITER_set(cstash, eiter);
-	    	   }
-	   }
+                    if (val) {
+                        txt = hv_iterkey(entry,&len);
+
+                        av_push(RETVAL, newSVpv(txt,0));
+                    }
+                }
+            }
+        }
     }
-
-    RETVAL = newRV((SV *)results);
 OUTPUT:
     RETVAL
