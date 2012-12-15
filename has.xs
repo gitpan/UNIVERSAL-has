@@ -51,7 +51,7 @@ CODE:
                 while ((entry = hv_iternext(cstash))) {
                     val = hv_iterval(cstash,entry);
 
-                    if (val && SvTYPE(cv) == SVt_PVCV) {
+                    if (val && SvTYPE(val) == SVt_PVCV) {
                         txt = hv_iterkey(entry,&len);
 
                         av_push(RETVAL, newSVpv(txt,0));
