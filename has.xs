@@ -9,6 +9,7 @@ MODULE = UNIVERSAL::has        PACKAGE = UNIVERSAL::has
 AV *
 xs_has(sv)
     SV * sv
+PROTOTYPE: $
 PREINIT:
     HV *pkg = NULL;
     AV *linear_av;
@@ -50,7 +51,7 @@ CODE:
                 while ((entry = hv_iternext(cstash))) {
                     val = hv_iterval(cstash,entry);
 
-                    if (val) {
+                    if (val && SvTYPE(cv) == SVt_PVCV) {
                         txt = hv_iterkey(entry,&len);
 
                         av_push(RETVAL, newSVpv(txt,0));
